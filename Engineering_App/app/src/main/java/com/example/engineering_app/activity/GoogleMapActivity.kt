@@ -44,12 +44,5 @@ class GoogleMapActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun initView(){
-        binding.zoomIn.setOnClickListener {
-
-        }
-
-        binding.zoomOut.setOnClickListener {
-            CameraUpdateFactory.zoomOut()
-        }
     }
 }
