@@ -1,9 +1,14 @@
 package com.example.engineering_app
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.engineering_app.activity.ChatBotActivity
+import com.example.engineering_app.activity.KaKaoMapActivity
+import com.example.engineering_app.activity.NavigationActivity
 import com.example.engineering_app.adapter.MessageAdapter
 import com.example.engineering_app.databinding.ActivityMainBinding
 import com.example.engineering_app.model.Message
@@ -26,118 +31,26 @@ import java.util.concurrent.TimeUnit
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    val message: Message = Message("tmp", "tmp")
-    private var messageList: ArrayList<Message> = ArrayList<Message>()
-    val client: OkHttpClient = OkHttpClient()
-    private val messageAdapter: MessageAdapter = MessageAdapter(messageList)
-
-    val JSON: MediaType = "application/json; charset=utf-8".toMediaType()
-
-    private val mySecretKey: String = "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"
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-
-        binding.recyclerView.apply {
-            setHasFixedSize(true)
-            this.layoutManager = layoutManager
-            this.adapter = messageAdapter
-        }
-
-        binding.btnSend.setOnClickListener{
-            val question: String = binding.etMsg.text.toString()
-            addToChat(question, message.sendByMe)
-            binding.etMsg.text = null
-            callAPI(question)
-            binding.tvWelcome.visibility = View.GONE
-        }
-
-        client.newBuilder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(120, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
+        initView()
     }
 
-    private fun addToChat(message: String?, sentBy: String?) {
-        runOnUiThread {
-            messageList.add(Message(message!!, sentBy!!))
-            messageAdapter.notifyDataSetChanged()
-            binding.recyclerView.smoothScrollToPosition(messageAdapter.itemCount)
+    private fun initView(){
+        binding.goToChatBotActivity.setOnClickListener {
+            val intent = Intent(this, ChatBotActivity::class.java)
+            startActivity(intent)
         }
-    }
-
-    fun addResponse(response: String){
-        val message: Message = Message("tmp", "tmp")
-        messageList.removeAt(messageList.size - 1)
-        addToChat(response, message.sendByBot)
-    }
-
-    fun callAPI(question: String?) {
-        //okhttp
-        val message: Message = Message("tmp", "tmp")
-        messageList.add(Message("...", message.sendByBot))
-
-        //추가된 내용
-        val arr = JSONArray()
-        val baseAi = JSONObject()
-        val userMsg = JSONObject()
-        try {
-            //AI 속성설정
-            baseAi.put("role", "user")
-            baseAi.put("content", "You are a helpful and kind AI Assistant.")
-            //유저 메세지
-            userMsg.put("role", "user")
-            userMsg.put("content", question)
-            //array로 담아서 한번에 보낸다
-            arr.put(baseAi)
-            arr.put(userMsg)
-        } catch (e: JSONException) {
-            throw RuntimeException(e)
+        binding.goToNavigationActivity.setOnClickListener {
+            val intent = Intent(this, NavigationActivity::class.java)
+            startActivity(intent)
         }
-        val jsonObject = JSONObject()
-        try {
-            //모델명 변경
-            jsonObject.put("model", "gpt-3.5-turbo")
-            jsonObject.put("messages", arr)
-
-        } catch (e: JSONException) {
-            e.printStackTrace()
+        binding.goToKakaoMapActivity.setOnClickListener {
+            val intent = Intent(this, KaKaoMapActivity::class.java)
+            startActivity(intent)
         }
-        val body: RequestBody = jsonObject.toString().toRequestBody(JSON)
-        val request: Request = Request.Builder()
-            .url("https://api.openai.com/v1/chat/completions") //url 경로 수정됨
-            .header("Authorization", "Bearer $mySecretKey")
-            .post(body)
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                addResponse("Failed to load response due to " + e.message)
-            }
-
-            @Throws(IOException::class)
-            override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    var jsonObject: JSONObject? = null
-                    try {
-                        jsonObject = JSONObject(response.body!!.string())
-                        val jsonArray = jsonObject.getJSONArray("choices")
-                        val result =
-                            jsonArray.getJSONObject(0).getJSONObject("message").getString("content")
-                        addResponse(result.trim { it <= ' ' })
-                    } catch (e: JSONException) {
-                        e.printStackTrace()
-                    }
-                } else {
-                    addResponse("Failed to load response due to " + response.body!!.string())
-                }
-            }
-        })
     }
 }
