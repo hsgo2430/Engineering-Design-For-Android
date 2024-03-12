@@ -14,14 +14,14 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/bluetooth_off_btn"
+        app:layout_constraintEnd_toStartOf="@id/bluetooth_server_btn"
         />
 
     <Button
-        android:id="@+id/bluetooth_off_btn"
+        android:id="@+id/bluetooth_server_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="블루투스 끄기"
+        android:text="블루투스 서버켜기"
         android:layout_marginBottom="250dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"

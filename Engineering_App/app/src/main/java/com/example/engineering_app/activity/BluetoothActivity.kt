@@ -4,6 +4,7 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -48,6 +49,7 @@ class BluetoothActivity : AppCompatActivity() {
     lateinit var mBluetoothSocket: BluetoothSocket
     private lateinit var mBluetoothHandler: Handler
     var mThreadConnectedBluetooth: ConnectedBluetoothThread? = null
+    private var acceptThread: AcceptThread? = null
 
     private val adapter: ArrayList<Pair<String, String>> = ArrayList()
     private val pairing_device: ArrayList<String> = ArrayList()
@@ -97,6 +99,10 @@ class BluetoothActivity : AppCompatActivity() {
             else{
                 showMessage("mThreadConnectedBluetooth is null")
             }
+        }
+
+        binding.bluetoothServerBtn.setOnClickListener {
+            startServer()
         }
 
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
@@ -226,7 +232,7 @@ class BluetoothActivity : AppCompatActivity() {
         }
     }
 
-    fun connectSelectedDevice(selected_device: String, pairing_device: Set<BluetoothDevice>){
+    private fun connectSelectedDevice(selected_device: String, pairing_device: Set<BluetoothDevice>){
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
             mBluetoothDevice = pairing_device.firstOrNull { device_list ->
                 if (ActivityCompat.checkSelfPermission(
@@ -246,7 +252,7 @@ class BluetoothActivity : AppCompatActivity() {
             mBluetoothDevice = pairing_device.firstOrNull { device_list -> selected_device == device_list.name}!!
         }
 
-        /*try {
+        try {
             mBluetoothSocket = mBluetoothDevice.createRfcommSocketToServiceRecord(BT_UUID)
             Log.d("로그 소켓", mBluetoothSocket.toString())
             mBluetoothSocket.connect()
@@ -258,35 +264,33 @@ class BluetoothActivity : AppCompatActivity() {
         }
         catch (e: IOException){
             showMessage("블루투스 연결 중 오류가 발생했습니다.")
-        }*/
-        Thread {
-            try {
-                mBluetoothSocket = mBluetoothDevice.createInsecureRfcommSocketToServiceRecord(BT_UUID)
-                mBluetoothSocket.connect() // 비동기적 연결 시도
-                // 연결 성공 로그
-                Log.d("Bluetooth", "연결 성공")
-
-                // UI 스레드에서 UI 업데이트
-                runOnUiThread {
-                    // 예: 연결 상태 표시 업데이트
-                }
-
-                // 연결된 Bluetooth 스레드 시작
-                mThreadConnectedBluetooth = ConnectedBluetoothThread(mBluetoothSocket, mBluetoothHandler)
-                mThreadConnectedBluetooth!!.start()
-            } catch (e: IOException) {
-                // 연결 실패 로그
-                Log.e("Bluetooth", "연결 실패", e)
-
-                // UI 스레드에서 에러 메시지 표시
-                runOnUiThread {
-                    showMessage("블루투스 연결 중 오류가 발생했습니다.")
-                }
-            }
-        }.start()
+        }
     }
 
-
+    private fun startServer() {
+        val serverSocket: BluetoothServerSocket? by lazy(LazyThreadSafetyMode.NONE) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.BLUETOOTH_ADMIN,
+                        Manifest.permission.BLUETOOTH
+                    ),
+                    REQUEST_BLUETOOTH_CONNECT_PERMISSION
+                )
+            }
+            bluetoothAdapter?.listenUsingRfcommWithServiceRecord("MyApp", BT_UUID)
+        }
+        acceptThread = AcceptThread(serverSocket)
+        acceptThread?.start()
+        showMessage("서버 시작: 클라이언트의 연결을 기다립니다...")
+    }
 
     class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handler) : Thread() {
         private val mmSocket: BluetoothSocket = socket
@@ -344,6 +348,53 @@ class BluetoothActivity : AppCompatActivity() {
                 showMessage( "소켓 해제 중 오류가 발생했습니다.")
             }
         }
+    }
+
+    inner class AcceptThread(serverSocket: BluetoothServerSocket?) : Thread() {
+
+        val serverSocket = serverSocket
+
+        override fun run() {
+            var shouldLoop = true
+            while (shouldLoop) {
+                val socket: BluetoothSocket? = try {
+                    serverSocket?.accept()
+                } catch (e: IOException) {
+                    Log.e("AcceptThread", "소켓의 accept() 메서드 실패", e)
+                    shouldLoop = false
+                    null
+                }
+                socket?.also {
+                    manageMyConnectedSocket(it)
+                    serverSocket?.close()
+                    shouldLoop = false
+                }
+            }
+        }
+
+        // 클라이언트와 연결된 후의 처리
+        private fun manageMyConnectedSocket(socket: BluetoothSocket) {
+            mThreadConnectedBluetooth = ConnectedBluetoothThread(socket, mBluetoothHandler).apply {
+                start()
+            }
+            runOnUiThread {
+                showMessage("클라이언트와 연결되었습니다.")
+            }
+        }
+
+        fun cancel() {
+            try {
+                serverSocket?.close()
+            } catch (e: IOException) {
+                Log.e("AcceptThread", "서버 소켓을 닫는데 실패", e)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        acceptThread?.cancel()
+        mThreadConnectedBluetooth?.cancel()
     }
 
 }
