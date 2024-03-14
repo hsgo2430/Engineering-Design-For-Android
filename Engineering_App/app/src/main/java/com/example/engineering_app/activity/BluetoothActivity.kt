@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.os.SystemClock
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -21,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.engineering_app.databinding.ActivityBluetoothBinding
+import com.example.engineering_app.tts.MyTTS
 import com.example.engineering_app.utils.Extension.showMessage
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.IOException
@@ -54,6 +56,8 @@ class BluetoothActivity : AppCompatActivity() {
     private val adapter: ArrayList<Pair<String, String>> = ArrayList()
     private val pairing_device: ArrayList<String> = ArrayList()
 
+    lateinit var textToSpeech: MyTTS
+
     private val activityResultLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (it.resultCode == RESULT_OK) {
@@ -66,7 +70,6 @@ class BluetoothActivity : AppCompatActivity() {
     private val BT_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     companion object {
-        private const val REQUEST_LOCATION_PERMISSION = 1
         private const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
         private const val BT_MESSAGE_READ = 2
 
@@ -83,6 +86,9 @@ class BluetoothActivity : AppCompatActivity() {
     }
 
     private fun initView() {
+
+        textToSpeech = MyTTS(this, null)
+
         binding.bluetoothOnBtn.setOnClickListener {
             bluetoothOn()
         }
@@ -109,7 +115,12 @@ class BluetoothActivity : AppCompatActivity() {
             override fun handleMessage(msg: Message) {
                 if (msg.what == BT_MESSAGE_READ) {
                     val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
+                    Log.e("로그", readMessage.toString())
+                    if (readMessage != null) {
+                        textToSpeech.speak(readMessage)
+                    }
                     binding.receiveDataTv.text = readMessage
+
                 }
             }
         }
@@ -218,14 +229,8 @@ class BluetoothActivity : AppCompatActivity() {
                 // 요청한 권한이 모두 부여되었는지 확인
                 if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     showMessage("권한이 부여되었습니다.")
-                    Log.d("권한", grantResults.isNotEmpty().toString())
-                    Log.d("권한", grantResults[0].toString())
-                    Log.d("권한", PackageManager.PERMISSION_GRANTED.toString())
                 } else {
                     showMessage("해당 기능을 지원하지 않습니다.")
-                    Log.d("권한", grantResults.isNotEmpty().toString())
-                    Log.d("권한", grantResults[0].toString())
-                    Log.d("권한", PackageManager.PERMISSION_GRANTED.toString())
                 }
                 return
             }
@@ -254,13 +259,9 @@ class BluetoothActivity : AppCompatActivity() {
 
         try {
             mBluetoothSocket = mBluetoothDevice.createRfcommSocketToServiceRecord(BT_UUID)
-            Log.d("로그 소켓", mBluetoothSocket.toString())
             mBluetoothSocket.connect()
-            Log.d("로그 연결", "연결")
             mThreadConnectedBluetooth = ConnectedBluetoothThread(mBluetoothSocket, mBluetoothHandler)
-            Log.d("로그 스레드", "스레드")
             mThreadConnectedBluetooth!!.start()
-            Log.d("로그 스레드 시작", "시작")
         }
         catch (e: IOException){
             showMessage("블루투스 연결 중 오류가 발생했습니다.")
@@ -321,6 +322,7 @@ class BluetoothActivity : AppCompatActivity() {
                 try {
                     bytes = mmInStream?.available() ?: 0
                     if (bytes != 0) {
+                        buffer.fill(0)
                         SystemClock.sleep(100)
                         bytes = mmInStream?.available() ?: 0
                         bytes = mmInStream?.read(buffer, 0, bytes) ?: 0
@@ -395,6 +397,7 @@ class BluetoothActivity : AppCompatActivity() {
         super.onDestroy()
         acceptThread?.cancel()
         mThreadConnectedBluetooth?.cancel()
+        textToSpeech.destroy()
     }
 
 }
