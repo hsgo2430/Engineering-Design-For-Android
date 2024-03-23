@@ -1,4 +1,4 @@
-package com.example.engineering_app.model
+package com.example.charvis.model
 
 data class Message (
     val message: String,

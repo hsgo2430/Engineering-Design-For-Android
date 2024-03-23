@@ -71,16 +71,4 @@
         app:layout_constraintTop_toTopOf="@+id/send_data_btn" />
 
 
-    <TextView
-        android:id="@+id/receive_data_tv"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Receive"
-        android:textSize="25dp"
-        app:layout_constraintStart_toStartOf="@+id/send_data_btn"
-        app:layout_constraintTop_toBottomOf="@+id/send_data_btn" />
-
-
-
 </androidx.constraintlayout.widget.ConstraintLayout>

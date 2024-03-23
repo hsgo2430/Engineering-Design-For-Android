@@ -6,7 +6,10 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -20,7 +23,11 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.charvis.databinding.ActivityBluetoothBinding
+import com.example.charvis.feature.ConnectedBluetoothThread
 import com.example.charvis.feature.TTS
 import com.example.charvis.feature.callAPI
 import com.example.charvis.utils.Extension.showMessage
@@ -37,6 +44,7 @@ import java.util.UUID
 
 class BluetoothActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBluetoothBinding
+    private val myDynamicReceiver = MyDynamicReceiver()
 
     private var permission_list = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -76,8 +84,8 @@ class BluetoothActivity : AppCompatActivity() {
     private val BT_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     companion object {
-        private const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
-        private const val BT_MESSAGE_READ = 2
+        const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
+        const val BT_MESSAGE_READ = 2
 
     }
 
@@ -89,6 +97,63 @@ class BluetoothActivity : AppCompatActivity() {
         ActivityCompat.requestPermissions(this, permission_list, 1);
 
         initView()
+        val filter = IntentFilter().apply {
+            addAction("ACTION_BLUETOOTH_ON")
+            addAction("ACTION_BLUETOOTH_OFF")
+        }
+        registerReceiver(myDynamicReceiver, filter)
+
+        sendBroadcast(Intent().apply {
+            action = "ACTION_BLUETOOTH_OFF"
+        })
+
+    }
+
+    /*private fun initBluetoothStateReceiver() {
+        Log.e("로그", "initBluetoothStateReceiver() 시작")
+        val bluetoothStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.e("로그", "onReceive()시작")
+                if ("BLUETOOTH_STATE_CHANGED" == intent?.action) {
+                    val state = intent.getIntExtra("state", BluetoothAdapter.ERROR)
+                    Log.e("로그", state.toString())
+                    when (state) {
+                        BluetoothAdapter.STATE_OFF -> {
+                            Log.e("로그", state.toString())
+                        }
+                        BluetoothAdapter.STATE_ON -> {
+                            Log.e("로그", state.toString())
+                        }
+                        // 필요한 경우 다른 상태들도 처리
+                    }
+                }
+            }
+        }
+
+        // 인텐트 필터를 생성하고, BLUETOOTH_STATE_CHANGED 액션을 추가합니다.
+        val filter = IntentFilter("BLUETOOTH_STATE_CHANGED")
+        // 리시버를 등록합니다.
+        LocalBroadcastManager.getInstance(this).registerReceiver(bluetoothStateReceiver, filter)
+    }*/
+
+    inner class MyDynamicReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                "ACTION_BLUETOOTH_ON" -> {
+                    Log.e("로그", "ACTION_BLUETOOTH_ON")
+                    binding.sendDataBtn.isVisible = true
+                    binding.connectBtn.isGone = true
+                }
+                "ACTION_BLUETOOTH_OFF" -> {
+                    Log.e("로그", "ACTION_BLUETOOTH_OFF")
+                    binding.sendDataBtn.isGone = true
+                    binding.connectBtn.isVisible = true
+                }
+                else -> {
+                    Log.e("로그", "오류")
+                }
+            }
+        }
     }
 
     private fun initView() {
@@ -260,13 +325,16 @@ class BluetoothActivity : AppCompatActivity() {
             mBluetoothSocket.connect()
             mThreadConnectedBluetooth = ConnectedBluetoothThread(mBluetoothSocket, mBluetoothHandler)
             mThreadConnectedBluetooth!!.start()
+            sendBroadcast(Intent().apply {
+                action = "ACTION_BLUETOOTH_ON"
+            })
         }
         catch (e: IOException){
             showMessage("블루투스 연결 중 오류가 발생했습니다.")
         }
     }
 
-    class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handler) : Thread() {
+    /*class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handler) : Thread() {
         private val mmSocket: BluetoothSocket = socket
         private val mmInStream: InputStream?
         private val mmOutStream: OutputStream?
@@ -323,11 +391,12 @@ class BluetoothActivity : AppCompatActivity() {
                 showMessage( "소켓 해제 중 오류가 발생했습니다.")
             }
         }
-    }
+    }*/
 
     override fun onDestroy() {
         super.onDestroy()
         mThreadConnectedBluetooth?.cancel()
+        unregisterReceiver(myDynamicReceiver)
         textToSpeech.destroy()
     }
 
