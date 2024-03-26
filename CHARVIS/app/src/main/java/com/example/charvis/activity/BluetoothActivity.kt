@@ -1,4 +1,4 @@
-package com.example.engineering_app.activity
+package com.example.charvis.activity
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
@@ -6,25 +6,47 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.XmlResourceParser
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.os.SystemClock
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.example.engineering_app.databinding.ActivityBluetoothBinding
-import com.example.engineering_app.tts.MyTTS
-import com.example.engineering_app.utils.Extension.showMessage
+import androidx.core.content.ContextCompat
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.example.charvis.App
+import com.example.charvis.R
+import com.example.charvis.databinding.ActivityBluetoothBinding
+import com.example.charvis.feature.ConnectedBluetoothThread
+import com.example.charvis.feature.TTS
+import com.example.charvis.feature.callAPI
+import com.example.charvis.feature.findNearestNeighbor
+import com.example.charvis.feature.searchLoadToTMap
+import com.example.charvis.model.LocationCallback
+import com.example.charvis.model.Point
+import com.example.charvis.utils.Extension.showMessage
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -34,8 +56,9 @@ import java.util.UUID
 
 class BluetoothActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBluetoothBinding
+    private val myDynamicReceiver = MyDynamicReceiver()
 
-    var permission_list = arrayOf(
+    private var permission_list = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
@@ -51,12 +74,15 @@ class BluetoothActivity : AppCompatActivity() {
     lateinit var mBluetoothSocket: BluetoothSocket
     private lateinit var mBluetoothHandler: Handler
     var mThreadConnectedBluetooth: ConnectedBluetoothThread? = null
-    private var acceptThread: AcceptThread? = null
 
     private val adapter: ArrayList<Pair<String, String>> = ArrayList()
     private val pairing_device: ArrayList<String> = ArrayList()
 
-    lateinit var textToSpeech: MyTTS
+    lateinit var textToSpeech: TTS
+
+    val client: OkHttpClient = OkHttpClient()
+    val JSON: MediaType = "application/json; charset=utf-8".toMediaType()
+    // chatGPT를 위한 변수
 
     private val activityResultLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -70,10 +96,14 @@ class BluetoothActivity : AppCompatActivity() {
     private val BT_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     companion object {
-        private const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
-        private const val BT_MESSAGE_READ = 2
+        const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
+        const val BT_MESSAGE_READ = 2
 
     }
+
+    private lateinit var sleepyRestArea: ArrayList<Point>
+    private lateinit var locationManager: LocationManager
+    private lateinit var currentPosition: Point
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,32 +113,73 @@ class BluetoothActivity : AppCompatActivity() {
         ActivityCompat.requestPermissions(this, permission_list, 1);
 
         initView()
+        bluetoothOn()
+
+        val filter = IntentFilter().apply {
+            addAction("ACTION_BLUETOOTH_ON")
+            addAction("ACTION_BLUETOOTH_OFF")
+        }
+        registerReceiver(myDynamicReceiver, filter)
+
+        sendBroadcast(Intent().apply {
+            action = "ACTION_BLUETOOTH_OFF"
+        })
+
+        sleepyRestArea = getXml()
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+    }
+
+    inner class MyDynamicReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                "ACTION_BLUETOOTH_ON" -> {
+                    binding.notConnectingCharvisImage.isGone = true
+                    binding.notConnectingCharvisTv.isGone = true
+                    binding.connectBtn.isGone = true
+
+                    binding.connectingCharvisImage.isVisible = true
+                    binding.connectingCharvisTv.isVisible = true
+                    binding.closeSleepyAreaBtn.isVisible = true
+                    binding.talkWithCharvisBtn.isVisible = true
+                }
+                "ACTION_BLUETOOTH_OFF" -> {
+                    binding.notConnectingCharvisImage.isVisible = true
+                    binding.notConnectingCharvisTv.isVisible = true
+                    binding.connectBtn.isVisible = true
+
+                    binding.connectingCharvisImage.isGone = true
+                    binding.connectingCharvisTv.isGone = true
+                    binding.closeSleepyAreaBtn.isGone = true
+                    binding.talkWithCharvisBtn.isGone = true
+                }
+                else -> {
+                    Log.e("로그", "오류")
+                }
+            }
+        }
     }
 
     private fun initView() {
 
-        textToSpeech = MyTTS(this, null)
-
-        binding.bluetoothOnBtn.setOnClickListener {
-            bluetoothOn()
-        }
+        textToSpeech = TTS(this, null)
 
         binding.connectBtn.setOnClickListener {
             getPairedDevices()
         }
 
-        binding.sendDataBtn.setOnClickListener {
-            if(mThreadConnectedBluetooth != null){
-                mThreadConnectedBluetooth!!.write(binding.insertSendDataTv.text.toString())
-                binding.insertSendDataTv.text.clear()
-            }
-            else{
-                showMessage("mThreadConnectedBluetooth is null")
-            }
+        binding.talkWithCharvisBtn.setOnClickListener {
+            callAPI(this.getString(R.string.want_to_talk_with_charvis), client, JSON, textToSpeech)
         }
 
-        binding.bluetoothServerBtn.setOnClickListener {
-            startServer()
+        binding.closeSleepyAreaBtn.setOnClickListener {
+            textToSpeech.speak("가까운 졸음 쉼터를 안내해 드릴게요.")
+            getCurrentPosition(object : LocationCallback {
+                override fun onLocationReceived(point: Point) {
+                    val nearestNeighbor = findNearestNeighbor(point, sleepyRestArea)
+                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                }
+            })
         }
 
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
@@ -116,24 +187,17 @@ class BluetoothActivity : AppCompatActivity() {
                 if (msg.what == BT_MESSAGE_READ) {
                     val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
                     Log.e("로그", readMessage.toString())
-                    if (readMessage != null) {
-                        textToSpeech.speak(readMessage)
-                    }
-                    binding.receiveDataTv.text = readMessage
-
+                    callAPI(readMessage, client, JSON, textToSpeech)
                 }
             }
         }
 
     }
-
     private fun bluetoothOn() {
         bluetoothAdapter?.let {
             if (!it.isEnabled) {
                 val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                 activityResultLauncher.launch(intent)
-            } else {
-                Toast.makeText(this, "이미 활성화 되어 있습니다.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -226,11 +290,10 @@ class BluetoothActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             REQUEST_BLUETOOTH_CONNECT_PERMISSION -> {
-                // 요청한 권한이 모두 부여되었는지 확인
                 if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    showMessage("권한이 부여되었습니다.")
+
                 } else {
-                    showMessage("해당 기능을 지원하지 않습니다.")
+
                 }
                 return
             }
@@ -262,141 +325,99 @@ class BluetoothActivity : AppCompatActivity() {
             mBluetoothSocket.connect()
             mThreadConnectedBluetooth = ConnectedBluetoothThread(mBluetoothSocket, mBluetoothHandler)
             mThreadConnectedBluetooth!!.start()
+            sendBroadcast(Intent().apply {
+                action = "ACTION_BLUETOOTH_ON"
+            })
         }
         catch (e: IOException){
             showMessage("블루투스 연결 중 오류가 발생했습니다.")
         }
     }
 
-    private fun startServer() {
-        val serverSocket: BluetoothServerSocket? by lazy(LazyThreadSafetyMode.NONE) {
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissions(
-                    arrayOf(
-                        Manifest.permission.BLUETOOTH_SCAN,
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.BLUETOOTH_ADMIN,
-                        Manifest.permission.BLUETOOTH
-                    ),
-                    REQUEST_BLUETOOTH_CONNECT_PERMISSION
-                )
-            }
-            bluetoothAdapter?.listenUsingRfcommWithServiceRecord("MyApp", BT_UUID)
-        }
-        acceptThread = AcceptThread(serverSocket)
-        acceptThread?.start()
-        showMessage("서버 시작: 클라이언트의 연결을 기다립니다...")
-    }
+    private fun getXml():ArrayList<Point>{
+        val parser: XmlResourceParser = resources.getXml(R.xml.sleepy_rest_area)
+        val sleepyRestArea: ArrayList<Point> = ArrayList<Point>()
+        val oneSleepyRestArea : ArrayList<String> = ArrayList<String>()
+        var count = 0
 
-    class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handler) : Thread() {
-        private val mmSocket: BluetoothSocket = socket
-        private val mmInStream: InputStream?
-        private val mmOutStream: OutputStream?
-        private val mBluetoothHandler = mBluetoothHandler
-
-        init {
-            var tmpIn: InputStream? = null
-            var tmpOut: OutputStream? = null
-
-            try {
-                tmpIn = socket.inputStream
-                tmpOut = socket.outputStream
-            } catch (e: IOException) {
-                showMessage("에러")
-            }
-
-            mmInStream = tmpIn
-            mmOutStream = tmpOut
-        }
-
-        override fun run() {
-            val buffer = ByteArray(1024)
-            var bytes: Int
-
-            while (true) {
-                try {
-                    bytes = mmInStream?.available() ?: 0
-                    if (bytes != 0) {
-                        buffer.fill(0)
-                        SystemClock.sleep(100)
-                        bytes = mmInStream?.available() ?: 0
-                        bytes = mmInStream?.read(buffer, 0, bytes) ?: 0
-                        mBluetoothHandler.obtainMessage(BT_MESSAGE_READ, bytes, -1, buffer).sendToTarget()
-                    }
-                } catch (e: IOException) {
-                    break
+        while (parser.eventType != XmlResourceParser.END_DOCUMENT) {
+            when (parser.eventType) {
+                XmlResourceParser.START_TAG -> {
+                    val tagName = parser.name
+                }
+                XmlResourceParser.TEXT -> {
+                    val text = parser.text
+                    oneSleepyRestArea.add(text)
+                    count++
+                }
+                XmlResourceParser.END_TAG -> {
+                    val tagName = parser.name
                 }
             }
-        }
 
-        fun write(str: String) {
-            val bytes = str.toByteArray()
-            try {
-                mmOutStream?.write(bytes)
-            } catch (e: IOException) {
-                showMessage("데이터 전송 중 오류가 발생했습니다.")
+            if(count == 3){
+                count = 0
+                sleepyRestArea.add(Point(oneSleepyRestArea[0], oneSleepyRestArea[1].toDouble(), oneSleepyRestArea[2].toDouble()))
+                oneSleepyRestArea.clear()
             }
+            parser.next()
         }
+        return sleepyRestArea
+    }
 
-        fun cancel() {
-            try {
-                mmSocket.close()
-            } catch (e: IOException) {
-                showMessage( "소켓 해제 중 오류가 발생했습니다.")
-            }
+    private fun getCurrentPosition(locationCallback: LocationCallback) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    val currentPosition = Point("현재위치", location.latitude, location.longitude)
+                    locationCallback.onLocationReceived(currentPosition) // 콜백 호출
+                }
+
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }, null)
         }
     }
 
-    inner class AcceptThread(serverSocket: BluetoothServerSocket?) : Thread() {
+    /*private fun getStartPosition(){
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // Request location updates
+            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object :
+                LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    current_position = Point(
+                        "현재위치",
+                        location.latitude,
+                        location.longitude
+                    )
 
-        val serverSocket = serverSocket
-
-        override fun run() {
-            var shouldLoop = true
-            while (shouldLoop) {
-                val socket: BluetoothSocket? = try {
-                    serverSocket?.accept()
-                } catch (e: IOException) {
-                    Log.e("AcceptThread", "소켓의 accept() 메서드 실패", e)
-                    shouldLoop = false
-                    null
                 }
-                socket?.also {
-                    manageMyConnectedSocket(it)
-                    serverSocket?.close()
-                    shouldLoop = false
+
+                override fun onStatusChanged(
+                    provider: String?,
+                    status: Int,
+                    extras: Bundle?
+                ) {
                 }
-            }
-        }
 
-        // 클라이언트와 연결된 후의 처리
-        private fun manageMyConnectedSocket(socket: BluetoothSocket) {
-            mThreadConnectedBluetooth = ConnectedBluetoothThread(socket, mBluetoothHandler).apply {
-                start()
-            }
-            runOnUiThread {
-                showMessage("클라이언트와 연결되었습니다.")
-            }
-        }
+                override fun onProviderEnabled(provider: String) {
+                }
 
-        fun cancel() {
-            try {
-                serverSocket?.close()
-            } catch (e: IOException) {
-                Log.e("AcceptThread", "서버 소켓을 닫는데 실패", e)
-            }
+                override fun onProviderDisabled(provider: String) {
+                }
+            }, null)
         }
-    }
+    }*/
 
     override fun onDestroy() {
         super.onDestroy()
-        acceptThread?.cancel()
         mThreadConnectedBluetooth?.cancel()
+        unregisterReceiver(myDynamicReceiver)
         textToSpeech.destroy()
     }
 

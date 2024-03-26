@@ -39,7 +39,6 @@ class NavigationActivity : AppCompatActivity(){
         setContentView(binding.root)
 
         sleepyRestArea = getXml()
-        Log.d("사이즈", sleepyRestArea.size.toString())
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
 
@@ -74,6 +73,7 @@ class NavigationActivity : AppCompatActivity(){
         }
 
         binding.goToNavigation.setOnClickListener {
+
             val nearestNeighbor = findNearestNeighbor(current_position, sleepyRestArea)
             binding.closestPosition.text = "$nearestNeighbor"
             //Log.d("로그", "Nearest neighbor to $current_position is $nearestNeighbor")
@@ -81,6 +81,7 @@ class NavigationActivity : AppCompatActivity(){
             //RetrofitManager.instance.getSleepyRestArea()
             searchLoadToTMap(this, current_position, nearestNeighbor)
             getXml()
+
         }
     }
 
@@ -115,33 +116,24 @@ class NavigationActivity : AppCompatActivity(){
             when (parser.eventType) {
                 XmlResourceParser.START_TAG -> {
                     val tagName = parser.name
-                    Log.d("로그 tagName", tagName.toString())
-                    // START_TAG를 처리하는 코드 추가
                 }
                 XmlResourceParser.TEXT -> {
                     val text = parser.text
                     oneSleepyRestArea.add(text)
-                    Log.d("로그 text", text)
                     count++
-                    // TEXT를 처리하는 코드 추가
                 }
                 XmlResourceParser.END_TAG -> {
                     val tagName = parser.name
-                    Log.d("로그 END_TAG", tagName.toString())
-                    // END_TAG를 처리하는 코드 추가
                 }
             }
 
             if(count == 3){
                 count = 0
                 sleepyRestArea.add(Point(oneSleepyRestArea[0], oneSleepyRestArea[1].toDouble(), oneSleepyRestArea[2].toDouble()))
-                Log.d("로그 리스트", oneSleepyRestArea.toString())
                 oneSleepyRestArea.clear()
             }
             parser.next()
         }
-        Log.d("로그 리스트", sleepyRestArea.toString())
-        Log.d("로그 사이즈", sleepyRestArea.size.toString())
         return sleepyRestArea
     }
 

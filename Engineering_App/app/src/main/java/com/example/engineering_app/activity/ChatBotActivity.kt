@@ -9,6 +9,7 @@ import com.example.engineering_app.adapter.MessageAdapter
 import com.example.engineering_app.databinding.ActivityChatBotBinding
 import com.example.engineering_app.databinding.ActivityMainBinding
 import com.example.engineering_app.model.Message
+import com.example.engineering_app.tts.MyTTS
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType
@@ -27,6 +28,8 @@ import java.util.concurrent.TimeUnit
 class ChatBotActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatBotBinding
 
+    lateinit var textToSpeech: MyTTS
+
     val message: Message = Message("tmp", "tmp")
     private var messageList: ArrayList<Message> = ArrayList<Message>()
     val client: OkHttpClient = OkHttpClient()
@@ -34,7 +37,7 @@ class ChatBotActivity : AppCompatActivity() {
 
     val JSON: MediaType = "application/json; charset=utf-8".toMediaType()
 
-    private val mySecretKey: String = "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"
+    private val mySecretKey: String = ""
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +46,8 @@ class ChatBotActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+
+        textToSpeech = MyTTS(this, null)
 
         binding.recyclerView.apply {
             setHasFixedSize(true)
@@ -132,6 +137,8 @@ class ChatBotActivity : AppCompatActivity() {
                         val jsonArray = jsonObject.getJSONArray("choices")
                         val result =
                             jsonArray.getJSONObject(0).getJSONObject("message").getString("content")
+                        Log.d("로그", result)
+                        textToSpeech.speak(result)
                         addResponse(result.trim { it <= ' ' })
                     } catch (e: JSONException) {
                         e.printStackTrace()

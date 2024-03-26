@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <ImageView
+        android:id="@+id/connecting_charvis_image"
+        android:layout_width="wrap_content"
+        android:layout_height="500dp"
+        android:background="@drawable/connecting_charvis"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <ImageView
+        android:id="@+id/not_connecting_charvis_image"
+        android:layout_width="wrap_content"
+        android:layout_height="500dp"
+        android:background="@drawable/not_connecting_charvis"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <TextView
+        android:id="@+id/connecting_charvis_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/yes_charvis_connecting"
+        android:textSize="25dp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@id/connecting_charvis_image"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <TextView
+        android:id="@+id/not_connecting_charvis_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/not_charvis_connecting"
+        android:textSize="25dp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@id/not_connecting_charvis_image"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <Button
+        android:id="@+id/talk_with_charvis_btn"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:text="@string/talk_with_charvis"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/close_sleepy_area_btn"
+        app:layout_constraintTop_toBottomOf="@id/connecting_charvis_tv"
+        app:layout_constraintBottom_toBottomOf="parent"
+        />
+
+    <Button
+        android:id="@+id/close_sleepy_area_btn"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:text="@string/close_sleepy_area"
+        app:layout_constraintStart_toEndOf="@id/talk_with_charvis_btn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/connecting_charvis_tv"
+        app:layout_constraintBottom_toBottomOf="parent"
+        />
+
+    <Button
+        android:id="@+id/connect_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/connection_charvis"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/not_connecting_charvis_tv"
+        app:layout_constraintBottom_toBottomOf="parent"
+         />
+
+
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
