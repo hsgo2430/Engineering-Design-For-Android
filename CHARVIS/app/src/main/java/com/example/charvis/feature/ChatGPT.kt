@@ -1,6 +1,7 @@
 package com.example.charvis.feature
 
 import android.util.Log
+import com.example.charvis.BuildConfig
 import com.example.charvis.model.Message
 import okhttp3.Call
 import okhttp3.Callback
@@ -18,10 +19,7 @@ import java.io.IOException
 
 
 fun callAPI(question: String?, client: OkHttpClient, JSON: MediaType, tts: TTS) {
-    val mySecretKey: String = ""
-
-    //okhttp
-    val message: Message = Message("tmp", "tmp")
+    val mySecretKey: String = BuildConfig.CHAT_GPT_KEY
 
     //추가된 내용
     val arr = JSONArray()
@@ -34,6 +32,7 @@ fun callAPI(question: String?, client: OkHttpClient, JSON: MediaType, tts: TTS) 
         //유저 메세지
         userMsg.put("role", "user")
         userMsg.put("content", question)
+        Log.e("로그", question.toString())
         //array로 담아서 한번에 보낸다
         arr.put(baseAi)
         arr.put(userMsg)
@@ -73,6 +72,7 @@ fun callAPI(question: String?, client: OkHttpClient, JSON: MediaType, tts: TTS) 
                     val result =
                         jsonArray.getJSONObject(0).getJSONObject("message").getString("content")
                     tts.speak(result)
+                    Log.e("로그", result)
                 } catch (e: JSONException) {
                     e.printStackTrace()
                 }

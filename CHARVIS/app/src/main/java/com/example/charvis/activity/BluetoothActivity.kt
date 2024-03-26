@@ -11,6 +11,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.XmlResourceParser
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -23,13 +28,20 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.example.charvis.App
+import com.example.charvis.R
 import com.example.charvis.databinding.ActivityBluetoothBinding
 import com.example.charvis.feature.ConnectedBluetoothThread
 import com.example.charvis.feature.TTS
 import com.example.charvis.feature.callAPI
+import com.example.charvis.feature.findNearestNeighbor
+import com.example.charvis.feature.searchLoadToTMap
+import com.example.charvis.model.LocationCallback
+import com.example.charvis.model.Point
 import com.example.charvis.utils.Extension.showMessage
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import okhttp3.MediaType
@@ -89,6 +101,10 @@ class BluetoothActivity : AppCompatActivity() {
 
     }
 
+    private lateinit var sleepyRestArea: ArrayList<Point>
+    private lateinit var locationManager: LocationManager
+    private lateinit var currentPosition: Point
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBluetoothBinding.inflate(layoutInflater)
@@ -97,6 +113,8 @@ class BluetoothActivity : AppCompatActivity() {
         ActivityCompat.requestPermissions(this, permission_list, 1);
 
         initView()
+        bluetoothOn()
+
         val filter = IntentFilter().apply {
             addAction("ACTION_BLUETOOTH_ON")
             addAction("ACTION_BLUETOOTH_OFF")
@@ -107,40 +125,15 @@ class BluetoothActivity : AppCompatActivity() {
             action = "ACTION_BLUETOOTH_OFF"
         })
 
+        sleepyRestArea = getXml()
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
     }
-
-    /*private fun initBluetoothStateReceiver() {
-        Log.e("로그", "initBluetoothStateReceiver() 시작")
-        val bluetoothStateReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                Log.e("로그", "onReceive()시작")
-                if ("BLUETOOTH_STATE_CHANGED" == intent?.action) {
-                    val state = intent.getIntExtra("state", BluetoothAdapter.ERROR)
-                    Log.e("로그", state.toString())
-                    when (state) {
-                        BluetoothAdapter.STATE_OFF -> {
-                            Log.e("로그", state.toString())
-                        }
-                        BluetoothAdapter.STATE_ON -> {
-                            Log.e("로그", state.toString())
-                        }
-                        // 필요한 경우 다른 상태들도 처리
-                    }
-                }
-            }
-        }
-
-        // 인텐트 필터를 생성하고, BLUETOOTH_STATE_CHANGED 액션을 추가합니다.
-        val filter = IntentFilter("BLUETOOTH_STATE_CHANGED")
-        // 리시버를 등록합니다.
-        LocalBroadcastManager.getInstance(this).registerReceiver(bluetoothStateReceiver, filter)
-    }*/
 
     inner class MyDynamicReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 "ACTION_BLUETOOTH_ON" -> {
-                    Log.e("로그", "ACTION_BLUETOOTH_ON")
                     binding.notConnectingCharvisImage.isGone = true
                     binding.notConnectingCharvisTv.isGone = true
                     binding.connectBtn.isGone = true
@@ -151,7 +144,6 @@ class BluetoothActivity : AppCompatActivity() {
                     binding.talkWithCharvisBtn.isVisible = true
                 }
                 "ACTION_BLUETOOTH_OFF" -> {
-                    Log.e("로그", "ACTION_BLUETOOTH_OFF")
                     binding.notConnectingCharvisImage.isVisible = true
                     binding.notConnectingCharvisTv.isVisible = true
                     binding.connectBtn.isVisible = true
@@ -176,6 +168,20 @@ class BluetoothActivity : AppCompatActivity() {
             getPairedDevices()
         }
 
+        binding.talkWithCharvisBtn.setOnClickListener {
+            callAPI(this.getString(R.string.want_to_talk_with_charvis), client, JSON, textToSpeech)
+        }
+
+        binding.closeSleepyAreaBtn.setOnClickListener {
+            textToSpeech.speak("가까운 졸음 쉼터를 안내해 드릴게요.")
+            getCurrentPosition(object : LocationCallback {
+                override fun onLocationReceived(point: Point) {
+                    val nearestNeighbor = findNearestNeighbor(point, sleepyRestArea)
+                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                }
+            })
+        }
+
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
                 if (msg.what == BT_MESSAGE_READ) {
@@ -187,14 +193,11 @@ class BluetoothActivity : AppCompatActivity() {
         }
 
     }
-
     private fun bluetoothOn() {
         bluetoothAdapter?.let {
             if (!it.isEnabled) {
                 val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                 activityResultLauncher.launch(intent)
-            } else {
-                Toast.makeText(this, "이미 활성화 되어 있습니다.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -287,11 +290,10 @@ class BluetoothActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             REQUEST_BLUETOOTH_CONNECT_PERMISSION -> {
-                // 요청한 권한이 모두 부여되었는지 확인
                 if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    showMessage("권한이 부여되었습니다.")
+
                 } else {
-                    showMessage("해당 기능을 지원하지 않습니다.")
+
                 }
                 return
             }
@@ -332,62 +334,83 @@ class BluetoothActivity : AppCompatActivity() {
         }
     }
 
-    /*class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handler) : Thread() {
-        private val mmSocket: BluetoothSocket = socket
-        private val mmInStream: InputStream?
-        private val mmOutStream: OutputStream?
-        private val mBluetoothHandler = mBluetoothHandler
+    private fun getXml():ArrayList<Point>{
+        val parser: XmlResourceParser = resources.getXml(R.xml.sleepy_rest_area)
+        val sleepyRestArea: ArrayList<Point> = ArrayList<Point>()
+        val oneSleepyRestArea : ArrayList<String> = ArrayList<String>()
+        var count = 0
 
-        init {
-            var tmpIn: InputStream? = null
-            var tmpOut: OutputStream? = null
-
-            try {
-                tmpIn = socket.inputStream
-                tmpOut = socket.outputStream
-            } catch (e: IOException) {
-                showMessage("에러")
-            }
-
-            mmInStream = tmpIn
-            mmOutStream = tmpOut
-        }
-
-        override fun run() {
-            val buffer = ByteArray(1024)
-            var bytes: Int
-
-            while (true) {
-                try {
-                    bytes = mmInStream?.available() ?: 0
-                    if (bytes != 0) {
-                        buffer.fill(0)
-                        SystemClock.sleep(100)
-                        bytes = mmInStream?.available() ?: 0
-                        bytes = mmInStream?.read(buffer, 0, bytes) ?: 0
-                        mBluetoothHandler.obtainMessage(BT_MESSAGE_READ, bytes, -1, buffer).sendToTarget()
-                    }
-                } catch (e: IOException) {
-                    break
+        while (parser.eventType != XmlResourceParser.END_DOCUMENT) {
+            when (parser.eventType) {
+                XmlResourceParser.START_TAG -> {
+                    val tagName = parser.name
+                }
+                XmlResourceParser.TEXT -> {
+                    val text = parser.text
+                    oneSleepyRestArea.add(text)
+                    count++
+                }
+                XmlResourceParser.END_TAG -> {
+                    val tagName = parser.name
                 }
             }
-        }
 
-        fun write(str: String) {
-            val bytes = str.toByteArray()
-            try {
-                mmOutStream?.write(bytes)
-            } catch (e: IOException) {
-                showMessage("데이터 전송 중 오류가 발생했습니다.")
+            if(count == 3){
+                count = 0
+                sleepyRestArea.add(Point(oneSleepyRestArea[0], oneSleepyRestArea[1].toDouble(), oneSleepyRestArea[2].toDouble()))
+                oneSleepyRestArea.clear()
             }
+            parser.next()
         }
+        return sleepyRestArea
+    }
 
-        fun cancel() {
-            try {
-                mmSocket.close()
-            } catch (e: IOException) {
-                showMessage( "소켓 해제 중 오류가 발생했습니다.")
-            }
+    private fun getCurrentPosition(locationCallback: LocationCallback) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    val currentPosition = Point("현재위치", location.latitude, location.longitude)
+                    locationCallback.onLocationReceived(currentPosition) // 콜백 호출
+                }
+
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }, null)
+        }
+    }
+
+    /*private fun getStartPosition(){
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // Request location updates
+            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object :
+                LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    current_position = Point(
+                        "현재위치",
+                        location.latitude,
+                        location.longitude
+                    )
+
+                }
+
+                override fun onStatusChanged(
+                    provider: String?,
+                    status: Int,
+                    extras: Bundle?
+                ) {
+                }
+
+                override fun onProviderEnabled(provider: String) {
+                }
+
+                override fun onProviderDisabled(provider: String) {
+                }
+            }, null)
         }
     }*/
 
