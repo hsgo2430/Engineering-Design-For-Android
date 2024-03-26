@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Charvis</string>
+    <string name="not_charvis_connecting">차비스와 연결되지 않았습니다\n차비스와 연결해 주세요!</string>
+    <string name="yes_charvis_connecting">차비스와 연결되었습니다\n차비스와 안전운전하세요!</string>
+    <string name="connection_charvis">차비스와 연결하기</string>
+    <string name="talk_with_charvis">차비스와 대화하기</string>
+    <string name="close_sleepy_area">가까운 졸음 쉼터 가기</string>
 </resources>

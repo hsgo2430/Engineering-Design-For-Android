@@ -141,13 +141,25 @@ class BluetoothActivity : AppCompatActivity() {
             when (intent.action) {
                 "ACTION_BLUETOOTH_ON" -> {
                     Log.e("로그", "ACTION_BLUETOOTH_ON")
-                    binding.sendDataBtn.isVisible = true
+                    binding.notConnectingCharvisImage.isGone = true
+                    binding.notConnectingCharvisTv.isGone = true
                     binding.connectBtn.isGone = true
+
+                    binding.connectingCharvisImage.isVisible = true
+                    binding.connectingCharvisTv.isVisible = true
+                    binding.closeSleepyAreaBtn.isVisible = true
+                    binding.talkWithCharvisBtn.isVisible = true
                 }
                 "ACTION_BLUETOOTH_OFF" -> {
                     Log.e("로그", "ACTION_BLUETOOTH_OFF")
-                    binding.sendDataBtn.isGone = true
+                    binding.notConnectingCharvisImage.isVisible = true
+                    binding.notConnectingCharvisTv.isVisible = true
                     binding.connectBtn.isVisible = true
+
+                    binding.connectingCharvisImage.isGone = true
+                    binding.connectingCharvisTv.isGone = true
+                    binding.closeSleepyAreaBtn.isGone = true
+                    binding.talkWithCharvisBtn.isGone = true
                 }
                 else -> {
                     Log.e("로그", "오류")
@@ -160,22 +172,8 @@ class BluetoothActivity : AppCompatActivity() {
 
         textToSpeech = TTS(this, null)
 
-        binding.bluetoothOnBtn.setOnClickListener {
-            bluetoothOn()
-        }
-
         binding.connectBtn.setOnClickListener {
             getPairedDevices()
-        }
-
-        binding.sendDataBtn.setOnClickListener {
-            if(mThreadConnectedBluetooth != null){
-                mThreadConnectedBluetooth!!.write(binding.insertSendDataTv.text.toString())
-                binding.insertSendDataTv.text.clear()
-            }
-            else{
-                showMessage("mThreadConnectedBluetooth is null")
-            }
         }
 
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
