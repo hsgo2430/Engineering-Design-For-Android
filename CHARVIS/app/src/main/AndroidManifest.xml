@@ -33,6 +33,7 @@
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -42,6 +43,15 @@
 
         <activity
             android:name=".activity.BluetoothActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ACTION_BLUETOOTH_ON"/>
+                <action android:name="ACTION_BLUETOOTH_OFF"/>
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".activity.SignUpActivity"
             android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
