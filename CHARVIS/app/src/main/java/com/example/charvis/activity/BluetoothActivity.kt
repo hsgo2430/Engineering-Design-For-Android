@@ -42,8 +42,14 @@ import com.example.charvis.feature.findNearestNeighbor
 import com.example.charvis.feature.searchLoadToTMap
 import com.example.charvis.model.LocationCallback
 import com.example.charvis.model.Point
+import com.example.charvis.model.User
 import com.example.charvis.utils.Extension.showMessage
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -57,6 +63,10 @@ import java.util.UUID
 class BluetoothActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBluetoothBinding
     private val myDynamicReceiver = MyDynamicReceiver()
+
+    private lateinit var uid: String
+    private lateinit var databaseReference: DatabaseReference
+    private var userdata: User = User()
 
     private var permission_list = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -162,6 +172,10 @@ class BluetoothActivity : AppCompatActivity() {
 
     private fun initView() {
 
+        uid = intent.getStringExtra("uid").toString()
+
+        getUserData(uid)
+
         textToSpeech = TTS(this, null)
 
         binding.connectBtn.setOnClickListener {
@@ -169,7 +183,7 @@ class BluetoothActivity : AppCompatActivity() {
         }
 
         binding.talkWithCharvisBtn.setOnClickListener {
-            callAPI(this.getString(R.string.want_to_talk_with_charvis), client, JSON, textToSpeech)
+            callAPI(this.getString(R.string.want_to_talk_with_charvis) + "내가 관심사는 "+ userdata.interest + "이야", client, JSON, textToSpeech)
         }
 
         binding.closeSleepyAreaBtn.setOnClickListener {
@@ -364,7 +378,38 @@ class BluetoothActivity : AppCompatActivity() {
         }
         return sleepyRestArea
     }
+    private fun getUserData(uid: String){
+        databaseReference = FirebaseDatabase.getInstance().getReference("User")
+        //데이터 베이스 경로 저장
+        databaseReference.child(uid).addValueEventListener(object:
+            ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val group: User? = snapshot.getValue(User::class.java)
+                userdata = User(
+                    nickname = group?.nickname.toString(),
+                    emailId = group?.emailId.toString(),
+                    password = group?.password.toString(),
+                    idToken = group?.idToken.toString(),
+                    interest = group?.interest.toString()
+                )
 
+                showMessage(userdata.nickname + "님 어서오세요!\n 관심사: " + userdata.interest)
+                Log.e("로그", userdata.toString())
+                Log.d("로그 유저데이터", userdata.toString())
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                userdata = User(
+                    nickname = "Null",
+                    emailId = "Null",
+                    password = "Null",
+                    idToken = "Null",
+                    interest = "Null"
+                )
+            }
+
+        })
+    }
     private fun getCurrentPosition(locationCallback: LocationCallback) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {

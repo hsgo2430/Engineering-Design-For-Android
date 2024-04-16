@@ -1,9 +1,9 @@
 package com.example.charvis.model
 
 data class User (
-    val nickname: String,
-    val emailId: String,
-    val password: String,
-    val idToken: String,
-    val interest: String
+    var nickname: String = "",
+    var emailId: String = "",
+    var password: String = "",
+    var idToken: String = "",
+    var interest: String = ""
 )
