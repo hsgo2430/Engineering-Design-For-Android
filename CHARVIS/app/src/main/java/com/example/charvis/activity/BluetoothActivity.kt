@@ -114,6 +114,10 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var sleepyRestArea: ArrayList<Point>
     private lateinit var locationManager: LocationManager
     private lateinit var currentPosition: Point
+    private var previousPosition: Point = Point("이전 위치", 0.00, 0.00)
+
+    private lateinit var handler: Handler
+    private lateinit var runnable: Runnable
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,6 +141,16 @@ class BluetoothActivity : AppCompatActivity() {
 
         sleepyRestArea = getXml()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        handler = Handler(Looper.getMainLooper())
+        runnable = object : Runnable {
+            override fun run() {
+                savePreviousPosition()  // 위치 저장 함수 호출
+                handler.postDelayed(this, 30000)  // 다시 30초 후에 실행
+            }
+        }
+
+        handler.post(runnable)
 
     }
 
@@ -190,8 +204,11 @@ class BluetoothActivity : AppCompatActivity() {
             textToSpeech.speak("가까운 졸음 쉼터를 안내해 드릴게요.")
             getCurrentPosition(object : LocationCallback {
                 override fun onLocationReceived(point: Point) {
-                    val nearestNeighbor = findNearestNeighbor(point, sleepyRestArea)
-                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                    val target2: Point = Point("임시", 36.9001423, 127.1889603) // 임시 데이터
+                    val tmpPrevious: Point = Point("임시 기준점", 36.9033423, 127.1889603) // 임시 도착지
+
+                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea)
+                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
                 }
             })
         }
@@ -394,8 +411,6 @@ class BluetoothActivity : AppCompatActivity() {
                 )
 
                 showMessage(userdata.nickname + "님 어서오세요!\n 관심사: " + userdata.interest)
-                Log.e("로그", userdata.toString())
-                Log.d("로그 유저데이터", userdata.toString())
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -410,6 +425,22 @@ class BluetoothActivity : AppCompatActivity() {
 
         })
     }
+
+    private fun savePreviousPosition() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    val previousPosition = Point("이전 위치", location.latitude, location.longitude)
+                    Log.d("로그", previousPosition.toString())
+                }
+
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }, null)
+        }
+    }
+
     private fun getCurrentPosition(locationCallback: LocationCallback) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {
@@ -464,6 +495,7 @@ class BluetoothActivity : AppCompatActivity() {
         mThreadConnectedBluetooth?.cancel()
         unregisterReceiver(myDynamicReceiver)
         textToSpeech.destroy()
+        handler.removeCallbacks(runnable)
     }
 
 }

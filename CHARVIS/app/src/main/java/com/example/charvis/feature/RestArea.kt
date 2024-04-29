@@ -5,32 +5,47 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import com.example.charvis.model.Point
-import kotlin.math.pow
-import kotlin.math.sqrt
+import kotlin.math.*
 
 fun distance(p1: Point, p2: Point): Double {
-    return sqrt((p1.latitude - p2.latitude).pow(2) + (p1.longtitude - p2.longtitude).pow(2))
+    return sqrt((p1.latitude - p2.latitude).pow(2) + (p1.longitude - p2.longitude).pow(2))
 }
 
-fun findNearestNeighbor(target: Point, points: List<Point>): Point? {
+fun angleBetweenVectors(v1: Point, v2: Point): Double {
+    val dotProduct = v1.latitude * v2.latitude + v1.longitude * v2.longitude
+    val magnitudeV1 = sqrt(v1.latitude.pow(2) + v1.longitude.pow(2))
+    val magnitudeV2 = sqrt(v2.latitude.pow(2) + v2.longitude.pow(2))
+    val cosTheta = dotProduct / (magnitudeV1 * magnitudeV2)
+    return acos(cosTheta) * (180 / PI)  // 결과는 도(degree) 단위
+}
+
+fun findNearestNeighbor(target: Point, standardPoint: Point, points: List<Point>): Point? {
+
     if (points.isEmpty()) return null
 
+    val targetVector = Point("방향벡터 1", target.latitude - standardPoint.latitude, target.longitude - standardPoint.longitude)
     var nearest: Point? = null
     var minDistance = Double.MAX_VALUE
 
     for (point in points) {
-        val dist = distance(target, point)
-        if (dist < minDistance) {
-            minDistance = dist
-            nearest = point
+        val pointVector = Point("방향벡터 2", point.latitude - standardPoint.latitude, point.longitude - standardPoint.longitude)
+        val angle = angleBetweenVectors(targetVector, pointVector)
+        if (angle <= 45.0) {  // 각도가 45도 이하인 경우에만 계산
+            Log.d("로그 벡터", point.toString() + angle.toString())
+            val dist = distance(target, point)
+            if (dist < minDistance) {
+                minDistance = dist
+                nearest = point
+            }
         }
     }
     return nearest
 }
 
 fun searchLoadToTMap(context: Context, startLocation: Point, endLocation: Point?) {
-    val url = "tmap://route?startx=${startLocation.longtitude}&starty=${startLocation.latitude}&goalx=${endLocation?.longtitude}&goaly=${endLocation?.latitude}&reqCoordType=WGS84&resCoordType=WGS84"
+    val url = "tmap://route?startx=${startLocation.longitude}&starty=${startLocation.latitude}&goalx=${endLocation?.longitude}&goaly=${endLocation?.latitude}&reqCoordType=WGS84&resCoordType=WGS84"
 
     val intent =  Intent(Intent.ACTION_VIEW, Uri.parse(url))
     intent.addCategory(Intent.CATEGORY_BROWSABLE)
