@@ -50,7 +50,11 @@ class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handl
                     SystemClock.sleep(100)
                     bytes = mmInStream?.available() ?: 0
                     bytes = mmInStream?.read(buffer, 0, bytes) ?: 0
-                    mBluetoothHandler.obtainMessage(BluetoothActivity.BT_MESSAGE_READ, bytes, -1, buffer).sendToTarget()
+                    if (bytes > 0) {
+                        val receivedString = buffer.copyOfRange(0, bytes).toString(Charsets.UTF_8)
+                        Log.d("로그 블루투스", receivedString)
+                        mBluetoothHandler.obtainMessage(BluetoothActivity.BT_MESSAGE_READ, bytes, -1, receivedString).sendToTarget()
+                    }
                 }
             } catch (e: IOException) {
                 break

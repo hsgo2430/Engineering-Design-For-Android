@@ -204,12 +204,17 @@ class BluetoothActivity : AppCompatActivity() {
             textToSpeech.speak("가까운 쉼터를 안내해 드릴게요.")
             getCurrentPosition(object : LocationCallback {
                 override fun onLocationReceived(point: Point) {
-                    val target2: Point = Point("임시", 36.9001423, 127.1889603) // 임시 데이터
-                    val tmpPrevious: Point = Point("임시 기준점", 36.9033423, 127.1889603) // 임시 도착지
+                    val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표
 
-                    //val nearestNeighbor = findNearestNeighbor(tmpPrevious, target2 ,sleepyRestArea) // 상행 코드
-                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                    //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
+                    //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
+
+                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
                     searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+
+                    //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                    //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
                 }
             })
         }
@@ -217,9 +222,33 @@ class BluetoothActivity : AppCompatActivity() {
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
                 if (msg.what == BT_MESSAGE_READ) {
-                    val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
-                    Log.e("로그", readMessage.toString())
-                    callAPI(readMessage, client, JSON, textToSpeech)
+                    //val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
+                    val readMessage = msg.obj.toString()
+                    Log.d("로그 블루투스 액티비티", readMessage.toString())
+                    if(readMessage == "1"){
+                        getCurrentPosition(object : LocationCallback {
+                            override fun onLocationReceived(point: Point) {
+                                val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                                val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표
+
+                                //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
+                                //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
+
+                                val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
+                                searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+
+                                //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                                //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+                            }
+                        })
+                    }
+                    else if(readMessage == "5"){
+                        val intent = Intent(this@BluetoothActivity, WarningSleepyActivity::class.java)
+                        startActivity(intent)
+                    }
+                    else{
+                        callAPI(readMessage, client, JSON, textToSpeech)
+                    }
                 }
             }
         }
@@ -411,7 +440,7 @@ class BluetoothActivity : AppCompatActivity() {
                     interest = group?.interest.toString()
                 )
 
-                showMessage(userdata.nickname + "님 어서오세요!\n 관심사: " + userdata.interest)
+                showMessage(userdata.nickname + "님 어서오세요!\n관심사: " + userdata.interest)
             }
 
             override fun onCancelled(error: DatabaseError) {
