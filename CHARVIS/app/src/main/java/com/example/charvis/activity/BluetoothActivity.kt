@@ -201,13 +201,14 @@ class BluetoothActivity : AppCompatActivity() {
         }
 
         binding.closeSleepyAreaBtn.setOnClickListener {
-            textToSpeech.speak("가까운 졸음 쉼터를 안내해 드릴게요.")
+            textToSpeech.speak("가까운 쉼터를 안내해 드릴게요.")
             getCurrentPosition(object : LocationCallback {
                 override fun onLocationReceived(point: Point) {
                     val target2: Point = Point("임시", 36.9001423, 127.1889603) // 임시 데이터
                     val tmpPrevious: Point = Point("임시 기준점", 36.9033423, 127.1889603) // 임시 도착지
 
-                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea)
+                    //val nearestNeighbor = findNearestNeighbor(tmpPrevious, target2 ,sleepyRestArea) // 상행 코드
+                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
                     searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
                 }
             })
