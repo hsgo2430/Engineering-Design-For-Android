@@ -74,6 +74,7 @@ class ConnectedBluetoothThread(socket: BluetoothSocket, mBluetoothHandler: Handl
     fun cancel() {
         try {
             mmSocket.close()
+
         } catch (e: IOException) {
             Extension.showMessage("소켓 해제 중 오류가 발생했습니다.")
         }

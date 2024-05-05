@@ -64,6 +64,8 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBluetoothBinding
     private val myDynamicReceiver = MyDynamicReceiver()
 
+    private var isBluetoothConnected: Boolean = false
+
     private lateinit var uid: String
     private lateinit var databaseReference: DatabaseReference
     private var userdata: User = User()
@@ -142,13 +144,20 @@ class BluetoothActivity : AppCompatActivity() {
         sleepyRestArea = getXml()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
+
         handler = Handler(Looper.getMainLooper())
+
         runnable = object : Runnable {
             override fun run() {
                 savePreviousPosition()  // 위치 저장 함수 호출
-                handler.postDelayed(this, 30000)  // 다시 30초 후에 실행
+                checkBluetoothConnetion(isBluetoothConnected) // 블루투스 연결 확인
+                Log.e("블루투스 로그", isBluetoothConnected.toString())
+                //handler.postDelayed(this, 30000)  // 다시 30초 후에 실행
+                handler.postDelayed(this, 10000)  // 다시 30초 후에 실행
             }
         }
+
+        handler.removeCallbacks(runnable)
 
         handler.post(runnable)
 
@@ -204,17 +213,20 @@ class BluetoothActivity : AppCompatActivity() {
             textToSpeech.speak("가까운 쉼터를 안내해 드릴게요.")
             getCurrentPosition(object : LocationCallback {
                 override fun onLocationReceived(point: Point) {
-                    val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
-                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표
+                    /*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*/
 
                     //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
                     //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
 
-                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
-                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+                    /*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
+                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*/
 
                     //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
                     //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+
+                    val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
+                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
                 }
             })
         }
@@ -223,31 +235,44 @@ class BluetoothActivity : AppCompatActivity() {
             override fun handleMessage(msg: Message) {
                 if (msg.what == BT_MESSAGE_READ) {
                     //val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
-                    val readMessage = msg.obj.toString()
-                    Log.d("로그 블루투스 액티비티", readMessage.toString())
-                    if(readMessage == "1"){
-                        getCurrentPosition(object : LocationCallback {
-                            override fun onLocationReceived(point: Point) {
-                                val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
-                                val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표
-
-                                //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
-                                //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
-
-                                val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
-                                searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
-
-                                //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
-                                //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
-                            }
-                        })
+                    val readMessage = msg.obj.toString().split("|")
+                    if(readMessage[0] == "0"){
+                        isBluetoothConnected = true
                     }
-                    else if(readMessage == "5"){
+                    if(readMessage[0] == "1"){
+                        showMessage("졸음 레벨이 1입니다.")
+                    }
+
+                    else if(readMessage[0] == "2"){
+                        callAPI(readMessage[2], client, JSON, textToSpeech)
+                    }
+
+                    else if(readMessage[0] == "3"){
+                        if(readMessage[1] == "1"){
+                            getCurrentPosition(object : LocationCallback {
+                                override fun onLocationReceived(point: Point) {
+                                    /*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*/
+
+                                    //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
+                                    //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
+
+                                    /*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
+                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*/
+
+                                    //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                                    //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+
+                                    val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
+                                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                                }
+                            })
+                        }
+                    }
+
+                    else if(readMessage[0] == "4"){
                         val intent = Intent(this@BluetoothActivity, WarningSleepyActivity::class.java)
                         startActivity(intent)
-                    }
-                    else{
-                        callAPI(readMessage, client, JSON, textToSpeech)
                     }
                 }
             }
@@ -389,9 +414,27 @@ class BluetoothActivity : AppCompatActivity() {
             sendBroadcast(Intent().apply {
                 action = "ACTION_BLUETOOTH_ON"
             })
+
+            isBluetoothConnected = true
+
+            mThreadConnectedBluetooth!!.write("0|"+ userdata.nickname + "|" + userdata.interest)
         }
         catch (e: IOException){
             showMessage("블루투스 연결 중 오류가 발생했습니다.")
+        }
+    }
+
+    private fun checkBluetoothConnetion(check: Boolean){
+        if (check){
+            Log.d("로그 불루투스", "Bluetooth is connected." + mThreadConnectedBluetooth.toString())
+            isBluetoothConnected = false
+            mThreadConnectedBluetooth!!.write("1|tmp|tmp")
+        }
+        else{
+            Log.d("로그 블루투스", "Bluetooth is not connected."+ mThreadConnectedBluetooth.toString())
+            sendBroadcast(Intent().apply {
+                action = "ACTION_BLUETOOTH_OFF"
+            })
         }
     }
 
@@ -475,7 +518,7 @@ class BluetoothActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object : LocationListener {
                 override fun onLocationChanged(location: Location) {
-                    val currentPosition = Point("현재위치", location.latitude, location.longitude)
+                    currentPosition = Point("현재위치", location.latitude, location.longitude)
                     locationCallback.onLocationReceived(currentPosition) // 콜백 호출
                 }
 

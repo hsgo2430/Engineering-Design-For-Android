@@ -93,13 +93,49 @@ class BluetoothActivity : AppCompatActivity() {
             bluetoothOn()
         }
 
-        binding.connectBtn.setOnClickListener {
-            getPairedDevices()
-        }
-
         binding.sendDataBtn.setOnClickListener {
             if(mThreadConnectedBluetooth != null){
                 mThreadConnectedBluetooth!!.write(binding.insertSendDataTv.text.toString())
+                binding.insertSendDataTv.text.clear()
+            }
+            else{
+                showMessage("mThreadConnectedBluetooth is null")
+            }
+        }
+
+        binding.levelOneTv.setOnClickListener {
+            if(mThreadConnectedBluetooth != null){
+                mThreadConnectedBluetooth!!.write("1|0|졸음 레벨은 1입니다.")
+                binding.insertSendDataTv.text.clear()
+            }
+            else{
+                showMessage("mThreadConnectedBluetooth is null")
+            }
+        }
+
+        binding.levelTwoTv.setOnClickListener {
+            if(mThreadConnectedBluetooth != null){
+                mThreadConnectedBluetooth!!.write("2|0|졸음 레벨은 2입니다.")
+                binding.insertSendDataTv.text.clear()
+            }
+            else{
+                showMessage("mThreadConnectedBluetooth is null")
+            }
+        }
+
+        binding.levelThreeTv.setOnClickListener {
+            if(mThreadConnectedBluetooth != null){
+                mThreadConnectedBluetooth!!.write("3|1|졸음 레벨은 3입니다.")
+                binding.insertSendDataTv.text.clear()
+            }
+            else{
+                showMessage("mThreadConnectedBluetooth is null")
+            }
+        }
+
+        binding.levelFourTv.setOnClickListener {
+            if(mThreadConnectedBluetooth != null){
+                mThreadConnectedBluetooth!!.write("4|0|졸음 레벨은 4입니다.")
                 binding.insertSendDataTv.text.clear()
             }
             else{
@@ -114,13 +150,18 @@ class BluetoothActivity : AppCompatActivity() {
         mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
                 if (msg.what == BT_MESSAGE_READ) {
-                    val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
-                    Log.e("로그", readMessage.toString())
-                    if (readMessage != null) {
-                        textToSpeech.speak(readMessage)
+                    val readMessage = msg.obj.toString().split("|")
+                    if(readMessage[0] == "0"){
+                        binding.receiveDataTv.text = "유저 정보: " + readMessage[1]+ ", " + readMessage [2]
                     }
-                    binding.receiveDataTv.text = readMessage
-
+                    else{
+                        if(mThreadConnectedBluetooth != null){
+                            mThreadConnectedBluetooth!!.write("0|0|0")
+                        }
+                        else{
+                            showMessage("mThreadConnectedBluetooth is null")
+                        }
+                    }
                 }
             }
         }
@@ -326,7 +367,11 @@ class BluetoothActivity : AppCompatActivity() {
                         SystemClock.sleep(100)
                         bytes = mmInStream?.available() ?: 0
                         bytes = mmInStream?.read(buffer, 0, bytes) ?: 0
-                        mBluetoothHandler.obtainMessage(BT_MESSAGE_READ, bytes, -1, buffer).sendToTarget()
+                        if (bytes > 0) {
+                            val receivedString = buffer.copyOfRange(0, bytes).toString(Charsets.UTF_8)
+                            Log.d("로그 블루투스", receivedString)
+                            mBluetoothHandler.obtainMessage(BluetoothActivity.BT_MESSAGE_READ, bytes, -1, receivedString).sendToTarget()
+                        }
                     }
                 } catch (e: IOException) {
                     break
