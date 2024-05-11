@@ -54,13 +54,18 @@
         <activity android:name=".activity.SignUpActivity"
             android:screenOrientation="portrait"
             android:exported="true">
+        </activity>
+
+        <activity android:name=".activity.WarningSleepyActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
             <intent-filter>
                 <action android:name="ACTION_BLUETOOTH_ON"/>
                 <action android:name="ACTION_BLUETOOTH_OFF"/>
             </intent-filter>
         </activity>
 
-        <activity android:name=".activity.WarningSleepyActivity"
+        <activity android:name=".activity.SignUpUserDataActivity"
             android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>

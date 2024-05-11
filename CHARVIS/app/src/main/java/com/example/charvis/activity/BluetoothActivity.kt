@@ -150,10 +150,10 @@ class BluetoothActivity : AppCompatActivity() {
         runnable = object : Runnable {
             override fun run() {
                 savePreviousPosition()  // 위치 저장 함수 호출
-                checkBluetoothConnetion(isBluetoothConnected) // 블루투스 연결 확인
+                //checkBluetoothConnetion(isBluetoothConnected) // 블루투스 연결 확인
                 Log.e("블루투스 로그", isBluetoothConnected.toString())
-                //handler.postDelayed(this, 30000)  // 다시 30초 후에 실행
-                handler.postDelayed(this, 10000)  // 다시 30초 후에 실행
+                handler.postDelayed(this, 30000)  // 다시 30초 후에 실행
+                //handler.postDelayed(this, 10000)  // 다시 30초 후에 실행
             }
         }
 
@@ -238,27 +238,31 @@ class BluetoothActivity : AppCompatActivity() {
                     val readMessage = msg.obj.toString().split("|")
                     if(readMessage[0] == "0"){
                         isBluetoothConnected = true
+                        sendBroadcast(Intent().apply {
+                            action = "ACTION_BLUETOOTH_ON"
+                        })
                     }
                     if(readMessage[0] == "1"){
                         showMessage("졸음 레벨이 1입니다.")
                     }
 
                     else if(readMessage[0] == "2"){
-                        callAPI(readMessage[2], client, JSON, textToSpeech)
+                        //callAPI(readMessage[2], client, JSON, textToSpeech)
+                        textToSpeech.speak(readMessage[2])
                     }
 
                     else if(readMessage[0] == "3"){
                         if(readMessage[1] == "1"){
-                            getCurrentPosition(object : LocationCallback {
+                            /*getCurrentPosition(object : LocationCallback {
                                 override fun onLocationReceived(point: Point) {
-                                    /*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
-                                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*/
+                                    *//*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*//*
 
                                     //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
                                     //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
 
-                                    /*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
-                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*/
+                                    *//*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
+                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*//*
 
                                     //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
                                     //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
@@ -266,12 +270,20 @@ class BluetoothActivity : AppCompatActivity() {
                                     val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
                                     searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
                                 }
-                            })
+                            })*/
+                            textToSpeech.speak(readMessage[2])
+                        }
+                        else{
+                            textToSpeech.speak(readMessage[2])
                         }
                     }
 
                     else if(readMessage[0] == "4"){
                         val intent = Intent(this@BluetoothActivity, WarningSleepyActivity::class.java)
+                        intent.putExtra("gender", userdata.gender)
+                        intent.putExtra("child", userdata.child)
+                        intent.putExtra("son", userdata.son)
+                        intent.putExtra("daughter", userdata.daughter)
                         startActivity(intent)
                     }
                 }
@@ -480,7 +492,11 @@ class BluetoothActivity : AppCompatActivity() {
                     emailId = group?.emailId.toString(),
                     password = group?.password.toString(),
                     idToken = group?.idToken.toString(),
-                    interest = group?.interest.toString()
+                    interest = group?.interest.toString(),
+                    gender = group?.gender.toString().toInt(),
+                    child = group?.child.toString().toBoolean(),
+                    son = group?.son.toString().toBoolean(),
+                    daughter = group?.daughter.toString().toBoolean()
                 )
 
                 showMessage(userdata.nickname + "님 어서오세요!\n관심사: " + userdata.interest)
@@ -492,7 +508,11 @@ class BluetoothActivity : AppCompatActivity() {
                     emailId = "Null",
                     password = "Null",
                     idToken = "Null",
-                    interest = "Null"
+                    interest = "Null",
+                    gender = -1,
+                    child = false,
+                    son = false,
+                    daughter = false
                 )
             }
 
@@ -528,41 +548,6 @@ class BluetoothActivity : AppCompatActivity() {
             }, null)
         }
     }
-
-    /*private fun getStartPosition(){
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            // Request location updates
-            locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, object :
-                LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    current_position = Point(
-                        "현재위치",
-                        location.latitude,
-                        location.longitude
-                    )
-
-                }
-
-                override fun onStatusChanged(
-                    provider: String?,
-                    status: Int,
-                    extras: Bundle?
-                ) {
-                }
-
-                override fun onProviderEnabled(provider: String) {
-                }
-
-                override fun onProviderDisabled(provider: String) {
-                }
-            }, null)
-        }
-    }*/
-
     override fun onDestroy() {
         super.onDestroy()
         mThreadConnectedBluetooth?.cancel()
