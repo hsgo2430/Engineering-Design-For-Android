@@ -18,7 +18,7 @@
         tools:targetApi="s" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:name=".App"
@@ -31,8 +31,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Charvis"
         tools:targetApi="31">
+
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -42,6 +44,29 @@
 
         <activity
             android:name=".activity.BluetoothActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ACTION_BLUETOOTH_ON"/>
+                <action android:name="ACTION_BLUETOOTH_OFF"/>
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".activity.SignUpActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+        </activity>
+
+        <activity android:name=".activity.WarningSleepyActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ACTION_BLUETOOTH_ON"/>
+                <action android:name="ACTION_BLUETOOTH_OFF"/>
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".activity.SignUpUserDataActivity"
             android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>

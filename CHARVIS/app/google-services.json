@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "306191685255",
+    "project_id": "charvis-d98eb",
+    "storage_bucket": "charvis-d98eb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306191685255:android:c43e1fbb253ed059a88a22",
+        "android_client_info": {
+          "package_name": "com.example.charvis"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlMnyKxg3kDX3HvHDgx8B4TfvMKic4phc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
