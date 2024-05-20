@@ -152,10 +152,11 @@ class BluetoothActivity : AppCompatActivity() {
                 if (msg.what == BT_MESSAGE_READ) {
                     val readMessage = msg.obj.toString().split("|")
                     if(readMessage[0] == "0"){
-                        binding.receiveDataTv.text = "유저 정보: " + readMessage[1]+ ", " + readMessage [2]
+                        if(readMessage.size > 1) binding.receiveDataTv.text = "유저 정보: " + readMessage[1]+ ", " + readMessage [2]
                     }
                     else{
                         if(mThreadConnectedBluetooth != null){
+                            binding.receiveDataTv.text = readMessage[0]
                             mThreadConnectedBluetooth!!.write("0|0|0")
                         }
                         else{

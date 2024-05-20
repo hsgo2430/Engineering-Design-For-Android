@@ -1,5 +1,6 @@
 package com.example.charvis.activity
 
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -54,6 +55,7 @@ class WarningSleepyActivity : AppCompatActivity() {
         val child = intent.getBooleanExtra("child", false)
         val son = intent.getBooleanExtra("son", false)
         val daughter = intent.getBooleanExtra("daughter", false)
+        val readMessage = intent.getStringExtra("readMessage")
 
 
         val filter = IntentFilter().apply {
@@ -71,10 +73,13 @@ class WarningSleepyActivity : AppCompatActivity() {
                 mediaPlayer.stop()
                 mediaPlayer.reset()
             }
+
+            val returnIntent = Intent(this@WarningSleepyActivity, BluetoothActivity::class.java)
+            returnIntent.putExtra("readMessage", readMessage)
+            setResult(Activity.RESULT_OK, returnIntent)
             finish()
         }
 
-        //mediaPlayer = MediaPlayer.create(this, R.raw.good_morning)
         mediaPlayer = setSound(child, gender, son, daughter)
         mediaPlayer.isLooping = true
         mediaPlayer.start()

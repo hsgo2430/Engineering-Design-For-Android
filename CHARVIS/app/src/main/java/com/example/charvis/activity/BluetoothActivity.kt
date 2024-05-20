@@ -1,6 +1,7 @@
 package com.example.charvis.activity
 
 import android.Manifest
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -31,8 +32,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.example.charvis.App
 import com.example.charvis.R
 import com.example.charvis.databinding.ActivityBluetoothBinding
 import com.example.charvis.feature.ConnectedBluetoothThread
@@ -50,13 +49,13 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
-import java.nio.charset.Charset
 import java.util.UUID
 
 
@@ -70,7 +69,7 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var databaseReference: DatabaseReference
     private var userdata: User = User()
 
-    private var permission_list = arrayOf(
+    private var permissionList = arrayOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
@@ -88,13 +87,15 @@ class BluetoothActivity : AppCompatActivity() {
     var mThreadConnectedBluetooth: ConnectedBluetoothThread? = null
 
     private val adapter: ArrayList<Pair<String, String>> = ArrayList()
-    private val pairing_device: ArrayList<String> = ArrayList()
+    private val pairingDevice: ArrayList<String> = ArrayList()
 
     lateinit var textToSpeech: TTS
 
     val client: OkHttpClient = OkHttpClient()
     val JSON: MediaType = "application/json; charset=utf-8".toMediaType()
     // chatGPT를 위한 변수
+
+    private val bluetoothScope = CoroutineScope(Dispatchers.IO)
 
     private val activityResultLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -111,6 +112,7 @@ class BluetoothActivity : AppCompatActivity() {
         const val REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1
         const val BT_MESSAGE_READ = 2
 
+        private const val REQUEST_CODE_WARNING_SLEEPY = 3
     }
 
     private lateinit var sleepyRestArea: ArrayList<Point>
@@ -121,12 +123,14 @@ class BluetoothActivity : AppCompatActivity() {
     private lateinit var handler: Handler
     private lateinit var runnable: Runnable
 
+    private lateinit var warningSleepyLauncher: ActivityResultLauncher<Intent>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBluetoothBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ActivityCompat.requestPermissions(this, permission_list, 1);
+        ActivityCompat.requestPermissions(this, permissionList, 1);
 
         initView()
         bluetoothOn()
@@ -161,6 +165,25 @@ class BluetoothActivity : AppCompatActivity() {
 
         handler.post(runnable)
 
+        bluetoothScope.launch {
+            maintainBluetoothConnection()
+        }
+
+        warningSleepyLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.let { data ->
+                    val readMessage = data.getStringExtra("readMessage")
+                    Log.e("로그 메시지", readMessage.toString())
+                    if (readMessage != null) {
+                        textToSpeech.speak(readMessage)
+                    }
+                    else{
+                        textToSpeech.speak("")
+                    }
+                }
+            }
+        }
+
     }
 
     inner class MyDynamicReceiver : BroadcastReceiver() {
@@ -192,14 +215,78 @@ class BluetoothActivity : AppCompatActivity() {
             }
         }
     }
+    private suspend fun maintainBluetoothConnection(){
+        mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                if (msg.what == BT_MESSAGE_READ) {
+                    //val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
+                    val readMessage = msg.obj.toString().split("|")
+                    if(readMessage[0] == "0"){
+                        isBluetoothConnected = true
+                        sendBroadcast(Intent().apply {
+                            action = "ACTION_BLUETOOTH_ON"
+                        })
+                    }
+                    if(readMessage[0] == "1"){
+                        showMessage("졸음 레벨이 1입니다.")
+                        textToSpeech.speak("")
+                    }
+
+                    else if(readMessage[0] == "2"){
+                        //callAPI(readMessage[2], client, JSON, textToSpeech)
+                        textToSpeech.speak(readMessage[2])
+
+                        //textToSpeech.speak("히딩크(Guus Hiddink)는 네덜란드 출신의 유명한 축구 감독입니다. 그는 특히 2002년 FIFA 월드컵에서 대한민국 국가대표팀을 이끌고 4강 진출이라는 역사적인 성과를 달성하면서 한국에서 매우 유명해졌습니다. 이 놀라운 성과 덕분에 그는 한국에서 국민적인 영웅으로 여겨지며, 히딩크 신드롬이라는 용어가 생겨날 정도로 큰 사랑을 받았습니다. 그의 리더십과 전술적인 능력은 전 세계 많은 축구 팬들에게 인정받고 있습니다.")
+                    }
+
+                    else if(readMessage[0] == "3"){
+                        if(readMessage[1] == "1"){
+                            textToSpeech.speak(readMessage[2])
+                            getCurrentPosition(object : LocationCallback {
+                                override fun onLocationReceived(point: Point) {
+                                    /*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
+                                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*/
+
+                                    val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
+                                    val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
+
+                                    /*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
+                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*/
+
+                                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+
+                                    //val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
+                                    //searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                                }
+                            })
+                        }
+                        else{
+                            textToSpeech.speak(readMessage[2])
+                        }
+                    }
+
+                    else if(readMessage[0] == "4"){
+                        val intent = Intent(this@BluetoothActivity, WarningSleepyActivity::class.java)
+                        intent.putExtra("gender", userdata.gender)
+                        intent.putExtra("child", userdata.child)
+                        intent.putExtra("son", userdata.son)
+                        intent.putExtra("daughter", userdata.daughter)
+                        //startActivity(intent)
+                        intent.putExtra("readMessage", readMessage[2]) // readMessage 값을 Intent에 추가
+                        warningSleepyLauncher.launch(intent)
+                        //textToSpeech.speak(readMessage[2])
+                    }
+                }
+            }
+        }
+    }
 
     private fun initView() {
 
         uid = intent.getStringExtra("uid").toString()
 
         getUserData(uid)
-
-        textToSpeech = TTS(this, null)
 
         binding.connectBtn.setOnClickListener {
             getPairedDevices()
@@ -216,80 +303,20 @@ class BluetoothActivity : AppCompatActivity() {
                     /*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
                     val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*/
 
-                    //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
-                    //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
+                    val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
+                    val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
 
                     /*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
                     searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*/
 
-                    //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
-                    //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
+                    val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
+                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
 
-                    val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
-                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
+                    //val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
+                    //searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
                 }
             })
         }
-
-        mBluetoothHandler = object : Handler(Looper.getMainLooper()) {
-            override fun handleMessage(msg: Message) {
-                if (msg.what == BT_MESSAGE_READ) {
-                    //val readMessage = (msg.obj as? ByteArray)?.toString(Charset.forName("UTF-8"))
-                    val readMessage = msg.obj.toString().split("|")
-                    if(readMessage[0] == "0"){
-                        isBluetoothConnected = true
-                        sendBroadcast(Intent().apply {
-                            action = "ACTION_BLUETOOTH_ON"
-                        })
-                    }
-                    if(readMessage[0] == "1"){
-                        showMessage("졸음 레벨이 1입니다.")
-                    }
-
-                    else if(readMessage[0] == "2"){
-                        //callAPI(readMessage[2], client, JSON, textToSpeech)
-                        textToSpeech.speak(readMessage[2])
-                    }
-
-                    else if(readMessage[0] == "3"){
-                        if(readMessage[1] == "1"){
-                            /*getCurrentPosition(object : LocationCallback {
-                                override fun onLocationReceived(point: Point) {
-                                    *//*val target2: Point = Point("임시 하행 출발", 36.9033423, 127.189265) // 임시 상행 현재 좌표
-                                    val tmpPrevious: Point = Point("임시 하행 도착", 36.9001423, 127.189265) // 임시 상행 이전 좌표*//*
-
-                                    //val target2: Point = Point("임시 하행 현재", 36.9001423, 127.1889603) // 임시 하행 현재 좌표
-                                    //val tmpPrevious: Point = Point("임시 하행 이전", 36.9033423, 127.1889603) // 임시 하행 이전 좌표
-
-                                    *//*val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 상행 코드
-                                    searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)*//*
-
-                                    //val nearestNeighbor = findNearestNeighbor(target2, tmpPrevious ,sleepyRestArea) // 하행 코드
-                                    //searchLoadToTMap(this@BluetoothActivity, target2, nearestNeighbor)
-
-                                    val nearestNeighbor = findNearestNeighbor(point, previousPosition ,sleepyRestArea) // 실제 코드
-                                    searchLoadToTMap(this@BluetoothActivity, point, nearestNeighbor)
-                                }
-                            })*/
-                            textToSpeech.speak(readMessage[2])
-                        }
-                        else{
-                            textToSpeech.speak(readMessage[2])
-                        }
-                    }
-
-                    else if(readMessage[0] == "4"){
-                        val intent = Intent(this@BluetoothActivity, WarningSleepyActivity::class.java)
-                        intent.putExtra("gender", userdata.gender)
-                        intent.putExtra("child", userdata.child)
-                        intent.putExtra("son", userdata.son)
-                        intent.putExtra("daughter", userdata.daughter)
-                        startActivity(intent)
-                    }
-                }
-            }
-        }
-
     }
     private fun bluetoothOn() {
         bluetoothAdapter?.let {
@@ -333,14 +360,14 @@ class BluetoothActivity : AppCompatActivity() {
                         val pairedDevices: Set<BluetoothDevice> = it.bondedDevices
                         if (pairedDevices.isNotEmpty()) {
                             adapter.clear()
-                            pairing_device.clear()
+                            pairingDevice.clear()
                             pairedDevices.forEach { device ->
                                 adapter.add(Pair(device.name, device.address))
-                                pairing_device.add(device.name)
+                                pairingDevice.add(device.name)
                             }
                             MaterialAlertDialogBuilder(this)
                                 .setTitle("페어링할 기기를 선택해 주세요")
-                                .setItems(pairing_device.toTypedArray()) { dialog, position -> connectSelectedDevice(pairing_device[position], pairedDevices) }
+                                .setItems(pairingDevice.toTypedArray()) { dialog, position -> connectSelectedDevice(pairingDevice[position], pairedDevices) }
                                 .show()
 
                         } else {
@@ -360,14 +387,14 @@ class BluetoothActivity : AppCompatActivity() {
                     Log.d("로그", it.bondedDevices.toString())
                     if (pairedDevices.isNotEmpty()) {
                         adapter.clear()
-                        pairing_device.clear()
+                        pairingDevice.clear()
                         pairedDevices.forEach { device ->
                             adapter.add(Pair(device.name, device.address))
-                            pairing_device.add(device.name)
+                            pairingDevice.add(device.name)
                         }
                         MaterialAlertDialogBuilder(this)
                             .setTitle("페어링할 기기를 선택해 주세요")
-                            .setItems(pairing_device.toTypedArray()) { dialog, position -> connectSelectedDevice(pairing_device[position], pairedDevices) }
+                            .setItems(pairingDevice.toTypedArray()) { dialog, position -> connectSelectedDevice(pairingDevice[position], pairedDevices) }
                             .show()
 
                     } else {
@@ -398,9 +425,9 @@ class BluetoothActivity : AppCompatActivity() {
         }
     }
 
-    private fun connectSelectedDevice(selected_device: String, pairing_device: Set<BluetoothDevice>){
+    private fun connectSelectedDevice(selected_device: String, pairingDevice: Set<BluetoothDevice>){
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
-            mBluetoothDevice = pairing_device.firstOrNull { device_list ->
+            mBluetoothDevice = pairingDevice.firstOrNull { device_list ->
                 if (ActivityCompat.checkSelfPermission(
                         this,
                         Manifest.permission.BLUETOOTH_CONNECT
@@ -415,7 +442,7 @@ class BluetoothActivity : AppCompatActivity() {
             }!!
         }
         else{
-            mBluetoothDevice = pairing_device.firstOrNull { device_list -> selected_device == device_list.name}!!
+            mBluetoothDevice = pairingDevice.firstOrNull { device_list -> selected_device == device_list.name}!!
         }
 
         try {
@@ -428,6 +455,8 @@ class BluetoothActivity : AppCompatActivity() {
             })
 
             isBluetoothConnected = true
+
+            textToSpeech = TTS(this, null, mThreadConnectedBluetooth!!)
 
             mThreadConnectedBluetooth!!.write("0|"+ userdata.nickname + "|" + userdata.interest)
         }
